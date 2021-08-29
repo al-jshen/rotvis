@@ -10,19 +10,28 @@ fn main() {
 
     let mut r = linereader::LineReader::new(std::io::stdin());
 
-    while w.render() {
+    'outer: while w.render() {
         if let Some(Ok(line)) = r.next_line() {
             let len = line.len();
-            let d = std::str::from_utf8(&line[..len - 1]).unwrap();
-            let v = d
-                .split(" ")
-                .map(|x| lexical::parse_lossy(x).unwrap())
-                .collect::<ArrayVec<f32, 3>>();
-            let rot = UnitQuaternion::from_euler_angles(
-                v[1] * std::f32::consts::PI / 180.,
-                0.,
-                v[0] * std::f32::consts::PI / 180.,
-            );
+            let d = match std::str::from_utf8(&line[..len - 1]) {
+                Ok(v) => v,
+                Err(_) => continue 'outer,
+            };
+
+            let mut v = ArrayVec::<f32, 3>::new();
+
+            for i in d.splitn(3, " ") {
+                match lexical::parse_lossy(i) {
+                    Ok(x) => v.push(x),
+                    Err(_) => continue 'outer,
+                }
+            }
+
+            if v.len() != 3 {
+                continue 'outer;
+            }
+
+            let rot = UnitQuaternion::from_euler_angles(v[1], 0., v[0]);
             c.set_local_rotation(rot);
         }
     }
